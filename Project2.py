@@ -25,10 +25,10 @@ def get_titles_from_search_results(filename):
     soup = soup.find('html')
 
     tr_tags = soup.find('table', class_ = "tableList").find('tbody').find_all('tr', recursive = False)
-    book_titles = [tr.find_all('td')[0].find('a').get('title').strip('\n') for tr in tr_tags]
+    book_titles = [tr.find_all('td')[1].find('a').find('span').text.strip('\n') for tr in tr_tags]
     authors = [tr.find_all('td')[1].find('a', class_ = "authorName").text.strip('\n') for tr in tr_tags]
 
-    return list(dict(zip(book_titles, authors)).items())
+    return list(zip(book_titles, authors))
 
 
 def get_search_links():
@@ -49,7 +49,7 @@ def get_search_links():
     soup = BeautifulSoup(r.text, 'html.parser')
 
     tr_tags = soup.find('table', class_ = "tableList").find_all('tr', recursive = False)
-    base_url = "https://www.goodreads.com/book/show"
+    base_url = "https://www.goodreads.com"
     urls = [base_url + tr.find_all('td')[1].find('a').get('href') for tr in tr_tags]
     return urls
 
@@ -77,9 +77,12 @@ def get_book_summary(book_url):
     reg_exp = r'\b(\d+) pages\b'
     page_number_matches = [int(i) for i in re.findall(reg_exp, soup.find(id = "details").text)]
 
-    if len(page_number_matches) != 1:
+    if len(page_number_matches) != 1 and len(page_number_matches) != 0:
         raise Exception("Could not find accurate page number count")
-    page_number = page_number_matches[0]
+    if len(page_number_matches) == 1:
+        page_number = page_number_matches[0]
+    else:
+        page_number = None
 
     return (book_title, author_name, page_number)
 
@@ -152,88 +155,139 @@ def extra_credit(filepath):
     Please see the instructions document for more information on how to complete this function.
     You do not have to write test cases for this function.
     """
-    reg_exp = "(?:[A-Z][a-z]*)(?: [A-Z][a-z]*)+"
+    current_dir = os.path.dirname(__file__)
+    full_filename = os.path.join(current_dir, filepath)
+
+    with open(full_filename, 'r', encoding='utf8') as fh:
+        file_text = fh.read()
+
+    soup = BeautifulSoup(file_text, 'html.parser')
+    description = soup.find(id = "description")
+    description = description.find_all('span')[1].text
+
+    reg_exp = "(?:[A-Z][a-z]{2,})(?: [A-Z][a-z]*)+"
+    
+    return re.findall(reg_exp, description)
 
 class TestCases(unittest.TestCase):
-
     # call get_search_links() and save it to a static variable: search_urls
-
+    search_urls = get_search_links()
 
     def test_get_titles_from_search_results(self):
         # call get_titles_from_search_results() on search_results.htm and save to a local variable
+        book_and_titles = get_titles_from_search_results("search_results.htm")
 
         # check that the number of titles extracted is correct (20 titles)
+        self.assertEqual(len(book_and_titles), 20)
 
         # check that the variable you saved after calling the function is a list
+        self.assertEqual(type(book_and_titles), list)
 
         # check that each item in the list is a tuple
+        for item in book_and_titles:
+            self.assertEqual(type(item), tuple)
 
         # check that the first book and author tuple is correct (open search_results.htm and find it)
+        self.assertEqual(book_and_titles[0], ('Harry Potter and the Deathly Hallows (Harry Potter, #7)', 'J.K. Rowling'))
 
         # check that the last title is correct (open search_results.htm and find it)
-        pass
+        self.assertEqual(book_and_titles[-1], ('Harry Potter: The Prequel (Harry Potter, #0.5)', 'J.K. Rowling'))
 
     def test_get_search_links(self):
         # check that TestCases.search_urls is a list
+        self.assertEqual(type(TestCases.search_urls), list)
 
         # check that the length of TestCases.search_urls is correct (10 URLs)
-
+        self.assertEqual(len(TestCases.search_urls), 20)
 
         # check that each URL in the TestCases.search_urls is a string
+        for item in TestCases.search_urls:
+            self.assertEqual(type(item), str)
+
         # check that each URL contains the correct url for Goodreads.com followed by /book/show/
-        pass
+        for item in TestCases.search_urls:
+            self.assertTrue(item.startswith('https://www.goodreads.com/book/show/'))
 
 
     def test_get_book_summary(self):
         # create a local variable – summaries – a list containing the results from get_book_summary()
+        summaries = []
+
+        
         # for each URL in TestCases.search_urls (should be a list of tuples)
-
+        for url in TestCases.search_urls:
+            summaries.append(get_book_summary(url))
+        
         # check that the number of book summaries is correct (10)
-
+        self.assertEqual(len(summaries), 20)
+            
+        for summary in summaries:
             # check that each item in the list is a tuple
-
+            self.assertEqual(type(summary), tuple)
+        
+        for summary in summaries:
             # check that each tuple has 3 elements
-
+            self.assertEqual(len(summary), 3)
+        
+        for summary in summaries:
             # check that the first two elements in the tuple are string
-
+            self.assertEqual(type(summary[0]), str)
+            self.assertEqual(type(summary[1]), str)
+        
+        for summary in summaries:
             # check that the third element in the tuple, i.e. pages is an int
+            self.assertTrue(summary[2] is None or type(summary[2]) == int)
 
-            # check that the first book in the search has 337 pages
-        pass
+        # check that the first book in the search has 337 pages
+        self.assertEqual(summaries[0][2], 337)
 
 
     def test_summarize_best_books(self):
         # call summarize_best_books and save it to a variable
+        s = summarize_best_books("best_books_2020.htm")
 
         # check that we have the right number of best books (20)
+        self.assertEqual(len(s), 20)
 
+        for item in s:
             # assert each item in the list of best books is a tuple
+            self.assertEqual(type(item), tuple)
 
             # check that each tuple has a length of 3
-        
+            self.assertEqual(len(item), 3)
 
         # check that the first tuple is made up of the following 3 strings:'Fiction', "The Midnight Library", 'https://www.goodreads.com/choiceawards/best-fiction-books-2020'
+        self.assertEqual(s[0], ('Fiction', "The Midnight Library", 'https://www.goodreads.com/choiceawards/best-fiction-books-2020'))
 
         # check that the last tuple is made up of the following 3 strings: 'Picture Books', 'Antiracist Baby', 'https://www.goodreads.com/choiceawards/best-picture-books-2020'
-        pass
+        self.assertEqual(s[-1], ('Picture Books', 'Antiracist Baby', 'https://www.goodreads.com/choiceawards/best-picture-books-2020'))
 
 
     def test_write_csv(self):
         # call get_titles_from_search_results on search_results.htm and save the result to a variable
+        s = get_titles_from_search_results("search_results.htm")
 
         # call write csv on the variable you saved and 'test.csv'
+        write_csv(s, 'test.csv')
 
         # read in the csv that you wrote (create a variable csv_lines - a list containing all the lines in the csv you just wrote to above)
-
+        with open('test.csv') as csv_file:
+            csv_reader = csv.reader(csv_file, delimiter=',')
+            csv_lines = []
+            for row in csv_reader:
+                csv_lines.append(row)
 
         # check that there are 21 lines in the csv
+        self.assertEqual(len(csv_lines), 21)
 
         # check that the header row is correct
+        self.assertEqual(csv_lines[0], ['Book title', 'Author Name'])
 
         # check that the next row is 'Harry Potter and the Deathly Hallows (Harry Potter, #7)', 'J.K. Rowling'
+        self.assertEqual(csv_lines[1], ['Harry Potter and the Deathly Hallows (Harry Potter, #7)', 'J.K. Rowling'])
 
         # check that the last row is 'Harry Potter: The Prequel (Harry Potter, #0.5)', 'J.K. Rowling'
-        pass
+        self.assertEqual(csv_lines[-1], ['Harry Potter: The Prequel (Harry Potter, #0.5)', 'J.K. Rowling'])
 
 
 
